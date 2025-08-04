@@ -1,37 +1,6 @@
 You're given a SystemVerilog class for a byte-addressable memory model, and you're asked to implement a method called move() 
 that copies data from one region of memory to another within the same array.
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-function void byte_memory_model::move(
-  bit [ADDR_W-1:0] source_address,
-  bit [ADDR_W-1:0] dest_address,
-  bit [ADDR_W-1:0] size
-);
-  // Check for out-of-bounds access
-  assert(source_address + size <= DEPTH)
-    else $fatal("Source range out of bounds: source_address=%0d, size=%0d", source_address, size);
-
-  assert(dest_address + size <= DEPTH)
-    else $fatal("Destination range out of bounds: dest_address=%0d, size=%0d", dest_address, size);
-
-  // Handle overlapping case safely
-  if (source_address < dest_address && (source_address + size) > dest_address) begin
-    // Overlapping and dest is after source, copy backwards
-    for (int i = size - 1; i >= 0; i--) begin
-      mem[dest_address + i] = mem[source_address + i];
-    end
-  end else begin
-    // No overlap or dest is before source, safe to copy forwards
-    for (int i = 0; i < size; i++) begin
-      mem[dest_address + i] = mem[source_address + i];
-    end
-  end
-endfunction
-
-
-If the destination overlaps the source and starts after, you copy backwards to prevent overwriting the source data.
-
-If there's no overlap or dest is before source, you can safely copy forwards.
-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 class byte_memory_model #(int DEPTH = 1024);
   localparam ADDR_W = $clog2(DEPTH);
   bit [7:0] mem[DEPTH];
@@ -71,4 +40,38 @@ class byte_memory_model #(int DEPTH = 1024);
     end
   endfunction
 endclass
+
+
+
+If the destination overlaps the source and starts after, you copy backwards to prevent overwriting the source data.
+
+If there's no overlap or dest is before source, you can safely copy forwards.
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+module test_memory_move;
+  byte_memory_model #(64) mem;
+
+  initial begin
+    mem = new();
+
+    // Step 1: Write values 1 to 10 at address 0 to 9
+    for (int i = 0; i < 10; i++) begin
+      mem.write(i, i + 1);
+    end
+
+    // Step 2: Move 10 bytes from address 0 to address 20
+    mem.move(0, 20, 10);
+
+    // Step 3: Print and verify values at new location
+    $display("After move from 0 to 20:");
+    for (int i = 0; i < 10; i++) begin
+      bit [7:0] val = mem.read(20 + i);
+      $display("mem[20 + %0d] = %0d", i, val);
+      assert(val == i + 1) else $fatal("Move failed at byte %0d", i);
+    end
+
+    $display("✅ Move function passed all checks.");
+    $finish;
+  end
+endmodule
+
 
